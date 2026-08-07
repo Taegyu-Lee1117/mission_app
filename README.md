@@ -1,237 +1,175 @@
-# TurtleBot Autonomous Mission
+# MATE: ROS 2 Collaborative Robot
 
-> **ROS 2와 TurtleBot3로 구현하는 실내 자율주행·순찰 로봇 프로젝트**
+> **사람의 의도를 이해하고, 같은 공간에서 안전하게 협업하는 지능형 로봇 동료**
 
 [![ROS 2](https://img.shields.io/badge/ROS%202-Humble-22314E?logo=ros)](https://docs.ros.org/en/humble/)
-[![TurtleBot3](https://img.shields.io/badge/Robot-TurtleBot3-00A6D6)](https://emanual.robotis.com/docs/en/platform/turtlebot3/overview/)
-[![Gazebo](https://img.shields.io/badge/Simulator-Gazebo-F58113?logo=gazebo)](https://gazebosim.org/)
-[![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-E95420?logo=ubuntu&logoColor=white)](https://ubuntu.com/)
+[![MoveIt 2](https://img.shields.io/badge/MoveIt%202-Motion%20Planning-5C4EE5)](https://moveit.picknik.ai/)
+[![Gazebo](https://img.shields.io/badge/Gazebo-Simulation-F58113)](https://gazebosim.org/)
+![Status](https://img.shields.io/badge/Status-Concept-orange)
 
-**TurtleBot Autonomous Mission**은 TurtleBot3가 미지의 실내 공간을 탐색하고, 생성한 지도 위에서 지정된 경유지를 순찰하며, 장애물이나 비상 상황에 스스로 대응하도록 설계한 ROS 2 기반 프로젝트입니다.
+MATE는 제조 및 물류 현장에서 작업자와 협업하는 **ROS 2 기반 6축 협동로봇 플랫폼**을 목표로 하는 프로젝트입니다. 비전 인식, 충돌 회피, 힘 제어, 작업 계획을 하나의 시스템으로 통합하여 부품 전달부터 정밀 조립까지 자연스럽고 안전한 Human-Robot Collaboration을 구현합니다.
 
-Gazebo 시뮬레이션부터 실제 로봇 배포까지 동일한 인터페이스를 사용하며, SLAM·Navigation·Mission Control을 독립된 모듈로 구성해 기능을 쉽게 확장할 수 있습니다.
+> [!NOTE]
+> 이 저장소는 협동로봇 프로젝트를 가정해 구성한 초기 콘셉트입니다. 아래 기능, 패키지, 실행 명령은 향후 구현 목표를 포함합니다.
 
----
-
-## Mission
-
-로봇에게 순찰 지점을 전달하면 다음 임무를 자율적으로 수행합니다.
-
-1. LiDAR와 Odometry를 이용해 현재 위치를 추정합니다.
-2. Nav2가 충돌 없는 최적 경로를 생성합니다.
-3. 지정된 경유지를 순서대로 방문합니다.
-4. 동적 장애물을 감지하면 감속하거나 경로를 재탐색합니다.
-5. 모든 지점의 순찰을 마친 뒤 충전 스테이션으로 복귀합니다.
+## Project Vision
 
 ```text
-[READY] -> [NAVIGATING] -> [INSPECTING] -> [NEXT WAYPOINT]
-   ^              |                                  |
-   |              v                                  |
-   +-------- [RECOVERY] <----------------------------+
-   |
-   +---------------------- [RETURN HOME] <- [COMPLETE]
+             Perception                    Intelligence
+        RGB-D / Pose / Gesture        Task Planner / Digital Twin
+                    \                    /
+                     \                  /
+                      +---- MATE ----+
+                     /                \
+                    /                  \
+          MoveIt 2 / Servo       Force / Safety Control
+              Manipulation              Interaction
 ```
+
+MATE가 지향하는 핵심 원칙은 세 가지입니다.
+
+- **Safe by Design**: 사람 감지, 속도 및 거리 모니터링, 비상 정지를 제어 전 주기에 반영합니다.
+- **Natural Collaboration**: 제스처와 작업 상태를 인식해 별도의 복잡한 조작 없이 사람과 협업합니다.
+- **Simulation First**: Gazebo와 RViz에서 검증한 동일한 ROS 2 인터페이스를 실제 로봇에도 적용합니다.
 
 ## Key Features
 
-| 기능 | 설명 |
+| 영역 | 주요 기능 |
 | --- | --- |
-| 실시간 지도 생성 | `slam_toolbox` 기반 2D SLAM 및 지도 저장 |
-| 자율주행 | Nav2 기반 전역·지역 경로 계획과 장애물 회피 |
-| 다중 경유지 순찰 | YAML로 정의한 순찰 지점을 순차적으로 수행 |
-| 자동 복구 | 경로 이탈, 주행 정체, 목표 실패 시 행동 트리 기반 복구 |
-| 상태 모니터링 | 배터리, 위치, 현재 임무, 성공률을 토픽으로 제공 |
-| Simulation First | Gazebo에서 검증한 설정을 실제 TurtleBot3에 동일하게 적용 |
-| 긴급 정지 | 장애물 근접 또는 사용자 명령에 즉시 주행 정지 |
+| Motion Planning | MoveIt 2 기반 경로 계획, 실시간 장애물 회피, Cartesian 제어 |
+| Robot Vision | RGB-D 객체 검출, 6D Pose 추정, Hand-Eye Calibration |
+| Collaboration | 작업자 접근 감지, 제스처 기반 명령, 부품 인계 시나리오 |
+| Safety | Safety Zone, 속도 제한, 충돌 및 접촉 감지, E-Stop 연동 |
+| Manipulation | Adaptive Gripper, 힘/토크 기반 삽입 및 조립, ROS 2 Control |
+| Digital Twin | Gazebo 시뮬레이션, RViz 시각화, rosbag 기반 재현 및 분석 |
+
+## Demo Scenario
+
+대표 데모는 작업자와 로봇이 함께 수행하는 **스마트 조립 셀**입니다.
+
+1. RGB-D 카메라가 작업대의 부품 종류와 위치를 인식합니다.
+2. 작업자의 손짓 또는 작업 지시를 받아 필요한 부품을 선택합니다.
+3. MoveIt 2가 작업자와 장애물을 고려한 안전 경로를 생성합니다.
+4. 로봇이 부품을 집어 작업자에게 전달하거나 조립 위치에 삽입합니다.
+5. 힘/토크 센서로 체결 상태를 확인하고 작업 결과를 기록합니다.
 
 ## System Architecture
 
 ```mermaid
 flowchart LR
-    A[2D LiDAR] --> B[SLAM / Localization]
-    C[Wheel Odometry] --> B
-    B --> D[Nav2 Stack]
-    E[Mission Manager] -->|NavigateToPose| D
-    D --> F[Global & Local Planner]
-    F --> G[cmd_vel]
-    G --> H[TurtleBot3]
-    H --> C
-    I[RViz2 / Operator] --> E
-    E --> J[Mission Status]
+    CAM[RGB-D Camera] --> PER[Perception]
+    FTS[Force/Torque Sensor] --> SAFE[Safety Supervisor]
+    PER --> SCENE[Planning Scene]
+    HMI[Gesture / HMI] --> TASK[Task Planner]
+    TASK --> MOVEIT[MoveIt 2]
+    SCENE --> MOVEIT
+    SAFE --> MOVEIT
+    MOVEIT --> CTRL[ros2_control]
+    CTRL --> ARM[6-Axis Cobot]
+    CTRL --> GRIP[Adaptive Gripper]
+    ARM --> FTS
 ```
 
-### Tech Stack
-
-- **Platform:** TurtleBot3 Burger / Waffle Pi
-- **Middleware:** ROS 2 Humble, DDS
-- **Localization:** AMCL, Robot Localization
-- **Mapping:** SLAM Toolbox
-- **Navigation:** Nav2, Behavior Tree
-- **Simulation:** Gazebo, RViz2
-- **Language:** Python 3, C++17
-
-## Package Structure
+### Planned Packages
 
 ```text
-mission_app/
-├── mission_bringup/        # 전체 시스템 실행 및 파라미터
-│   ├── launch/
-│   └── config/
-├── mission_control/        # 경유지 관리와 임무 상태 머신
-├── mission_navigation/     # Nav2 설정 및 커스텀 Behavior Tree
-├── mission_description/    # 로봇 모델과 Gazebo 월드
-├── mission_interfaces/     # 커스텀 Message, Service, Action
-├── maps/                   # 저장된 지도와 순찰 경로
-└── README.md
+mate_ws/src/
+├── mate_bringup/          # 전체 시스템 실행 및 파라미터
+├── mate_description/      # URDF/Xacro, meshes, SRDF
+├── mate_gazebo/           # 디지털 트윈 및 테스트 월드
+├── mate_moveit_config/    # MoveIt 2 설정과 motion pipeline
+├── mate_perception/       # 객체/작업자 인식과 pose estimation
+├── mate_manipulation/     # Pick, handover, assembly skill
+├── mate_safety/           # Safety zone과 supervisor
+└── mate_interfaces/       # Custom message, service, action
 ```
 
-> 위 구조는 프로젝트의 목표 아키텍처를 나타냅니다. 필요한 패키지를 순서대로 구현하며 확장할 수 있습니다.
+## Tech Stack
 
-## Quick Start
+- **Middleware**: ROS 2 Humble, DDS
+- **Motion**: MoveIt 2, MoveIt Servo, OMPL
+- **Control**: ros2_control, joint trajectory controller
+- **Simulation**: Gazebo, RViz 2
+- **Perception**: OpenCV, PCL, optional YOLO/ONNX Runtime
+- **Language**: C++17, Python 3
+- **Platform**: Ubuntu 22.04
 
-### 1. Requirements
+## Getting Started
+
+### Requirements
 
 - Ubuntu 22.04
-- ROS 2 Humble Hawksbill
-- Gazebo 11
-- TurtleBot3 Packages
-- Colcon
+- ROS 2 Humble
+- MoveIt 2
+- Gazebo 및 `colcon`, `rosdep`
 
-### 2. Workspace Setup
+### Build
+
+아래 명령은 패키지 구현 이후 사용할 예정인 워크스페이스 구성 예시입니다.
 
 ```bash
-mkdir -p ~/turtlebot_ws/src
-cd ~/turtlebot_ws/src
-git clone https://github.com/Taegyu-Lee1117/mission_app.git
-
-cd ~/turtlebot_ws
+mkdir -p ~/mate_ws/src
+cd ~/mate_ws/src
+git clone https://github.com/<your-org>/mate.git
+cd ~/mate_ws
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
 ```
 
-### 3. Run Simulation
+### Run Simulation
 
 ```bash
-export TURTLEBOT3_MODEL=burger
-ros2 launch mission_bringup simulation.launch.py
+ros2 launch mate_bringup simulation.launch.py
 ```
 
-RViz2에서 초기 위치를 지정한 후 샘플 순찰 임무를 시작합니다.
+### Run Collaborative Assembly Demo
 
 ```bash
-ros2 launch mission_control patrol.launch.py \
-  route:=config/demo_route.yaml \
-  loop:=false
+ros2 launch mate_bringup assembly_demo.launch.py use_sim:=true
 ```
 
-### 4. Build a Map
+시뮬레이션 실행 후 RViz의 Planning Scene에서 작업자 안전 영역과 로봇 경로를 확인할 수 있습니다.
 
-```bash
-ros2 launch mission_bringup mapping.launch.py
-ros2 run nav2_map_server map_saver_cli -f maps/office
-```
+## Safety Concept
 
-## Running on TurtleBot3
+MATE의 안전 계층은 로봇 동작 명령보다 항상 높은 우선순위를 갖도록 설계합니다.
 
-로봇과 Remote PC를 같은 네트워크에 연결하고 두 장치의 `ROS_DOMAIN_ID`를 동일하게 설정합니다.
-
-```bash
-export ROS_DOMAIN_ID=30
-export TURTLEBOT3_MODEL=burger
-```
-
-TurtleBot3 SBC에서 로봇 드라이버를 실행합니다.
-
-```bash
-ros2 launch turtlebot3_bringup robot.launch.py
-```
-
-Remote PC에서 자율주행과 미션 노드를 실행합니다.
-
-```bash
-ros2 launch mission_bringup robot_navigation.launch.py \
-  map:=maps/office.yaml
-```
-
-> 실제 주행 전에는 로봇 주변의 안전 공간을 확보하고 비상 정지 수단을 준비하세요.
-
-## Mission Configuration
-
-순찰 경로는 YAML 파일로 간단히 정의합니다.
-
-```yaml
-mission:
-  name: office_night_patrol
-  loop: false
-  return_home: true
-
-waypoints:
-  - name: entrance
-    pose: {x: 1.2, y: 0.4, yaw: 0.0}
-    wait_sec: 3
-  - name: meeting_room
-    pose: {x: 4.8, y: -1.5, yaw: 1.57}
-    wait_sec: 5
-  - name: server_room
-    pose: {x: 7.1, y: 2.3, yaw: 3.14}
-    wait_sec: 10
-```
-
-## ROS Interfaces
-
-| 이름 | 타입 | 용도 |
+| 상태 | 조건 | 동작 |
 | --- | --- | --- |
-| `/mission/start` | Service | 등록된 임무 시작 |
-| `/mission/cancel` | Service | 현재 임무 취소 및 정지 |
-| `/mission/status` | Topic | 진행 단계, 목표 지점, 성공률 제공 |
-| `/navigate_to_pose` | Action | Nav2 목표 위치 전달 |
-| `/cmd_vel` | Topic | 모바일 베이스 속도 명령 |
-| `/scan` | Topic | 2D LiDAR 거리 데이터 |
+| `NORMAL` | 작업자와 충분한 거리 유지 | 계획 속도로 작업 수행 |
+| `CAUTION` | 작업자가 감속 영역 진입 | TCP 속도 및 가속도 제한 |
+| `STOP` | 보호 영역 침범 또는 충돌 감지 | 즉시 정지 후 재계획 대기 |
+| `E-STOP` | 하드웨어 비상 정지 입력 | 구동 전원 차단 및 수동 복구 |
 
-## Demo Scenario
-
-**Office Night Patrol**은 퇴근 후 사무실을 순찰하는 시나리오입니다.
-
-- 출입구, 회의실, 서버실을 지정 순서로 방문
-- 각 구역에서 일정 시간 정지 후 상태 확인
-- 통로에 나타난 장애물을 감지하고 우회
-- 목표 도달 실패 시 최대 3회 복구 시도
-- 순찰 종료 후 시작 위치로 자동 복귀
-
-### Performance Goals
-
-| 항목 | 목표 |
-| --- | ---: |
-| 위치 추정 평균 오차 | 0.15 m 이하 |
-| 정적 장애물 회피 성공률 | 95% 이상 |
-| 경유지 도달 성공률 | 90% 이상 |
-| 긴급 정지 응답 시간 | 200 ms 이하 |
+> [!WARNING]
+> 본 프로젝트의 소프트웨어 안전 기능만으로 산업 현장의 안전을 보장할 수 없습니다. 실제 장비 적용 시 ISO 10218, ISO/TS 15066 및 현지 안전 규정을 기준으로 별도의 위험성 평가와 인증된 안전 장치를 사용해야 합니다.
 
 ## Roadmap
 
-- [x] 시스템 아키텍처 및 인터페이스 설계
-- [ ] Gazebo 사무실 월드 구축
-- [ ] SLAM 및 Nav2 파라미터 튜닝
-- [ ] 다중 경유지 Mission Manager 구현
-- [ ] 장애 상황 자동 복구 로직 구현
-- [ ] 실제 TurtleBot3 주행 검증
-- [ ] 웹 기반 실시간 관제 대시보드 연동
+- [ ] Phase 1: 로봇 모델, Gazebo 월드, ros2_control 통합
+- [ ] Phase 2: MoveIt 2 기반 Pick & Place와 충돌 회피
+- [ ] Phase 3: RGB-D 객체 인식 및 6D Pose 추정
+- [ ] Phase 4: 작업자 추적, Safety Zone, 감속/정지 정책
+- [ ] Phase 5: 힘 제어 기반 부품 인계 및 정밀 조립
+- [ ] Phase 6: 실제 협동로봇 연동과 통합 데모
 
 ## Contributing
 
-기능 제안과 버그 리포트는 Issue로 등록해 주세요. 변경 사항은 기능별 브랜치에서 개발하고, 시뮬레이션 테스트 결과를 포함해 Pull Request를 생성합니다.
+Issue와 Pull Request를 환영합니다. 새로운 기능은 시뮬레이션 테스트와 안전 영향 분석을 함께 제출해 주세요.
 
-```bash
-git checkout -b feat/mission-name
-colcon test --packages-select mission_control
-colcon test-result --verbose
-```
+1. 저장소를 Fork하고 기능 브랜치를 생성합니다.
+2. 변경 사항과 테스트를 작성합니다.
+3. `colcon test`로 전체 테스트를 확인합니다.
+4. 변경 목적과 검증 결과를 포함해 Pull Request를 생성합니다.
 
 ## License
 
-This project is licensed under the Apache License 2.0.
+라이선스는 실제 배포 정책과 사용 장비의 SDK 조건을 검토한 뒤 확정할 예정입니다.
 
 ---
 
-**Map the unknown. Plan the path. Complete the mission.**
+<p align="center">
+  <strong>MATE</strong> · Move together. Assemble smarter. Team up safely.
+</p>
